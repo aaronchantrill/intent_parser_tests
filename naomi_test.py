@@ -3,13 +3,15 @@ from pprint import pprint
 import re
 
 
-def replacenth(sub, wanted, string, n):
+# Replace the nth occurrance of sub
+# based on an answer by aleskva at 
+# https://stackoverflow.com/questions/35091557/replace-nth-occurrence-of-substring-in-string
+def replacenth(search_for, replace_with, string, n):
     try:
-        where = [m.start() for m in re.finditer(sub, string)][n]
+        where = [m.start() for m in re.finditer(search_for, string)][n]
         before = string[:where]
         after = string[where:]
-        after = after.replace(sub, wanted, 1)
-        # print("Before: {} After: {}".format(before,after))
+        after = after.replace(search_for, replace_with, 1)
         string = before + after
     except IndexError:
         pass
@@ -53,12 +55,15 @@ class Brain(object):
                 count=0  # count is the index of the match we are looking for
                 countadded=0  # keep track of variants added for this count
                 while True:
-                    added = 0 # if we get throut all the variants without adding any new variants, then increase the count.
+                    added = 0 # if we get through all the variants without adding any new variants, then increase the count.
                     for variant in variants:
                         #print("Count: {} Added: {} CountAdded: {}".format(count, added, countadded))
                         #print()
                         #print("word: '{}' variant: '{}'".format(word,variant))
+                        # subs is a list of substitutions
                         subs = dict(variants[variant])
+                        # check and see if we can make a substitution and
+                        # generate a new variant.
                         new = replacenth(word, '{'+keyword+'}', variant, count)
                         #print(new)
                         if new not in variants:
@@ -74,6 +79,8 @@ class Brain(object):
                             countadded += 1
                             # start looping over variants again
                             break
+                    # check if we were able to loop over all the variants
+                    # without creating any new ones
                     if added == 0:
                         if countadded == 0:
                             break
@@ -103,14 +110,8 @@ class Brain(object):
                 'matches': variants[variant],
                 'action': self.intent_map[best]['action']
             }
-        # pprint(variantscores)
-        # now take the best score out of scores
         best = max(variantscores, key=lambda key:variantscores[key]['score'])
         return variantscores[best]
-        #print(best)
-        #pprint(variantscores[best])
-        #print("")
-        # score = {best: variantscores[best]
         
 
 if __name__ == "__main__":
@@ -220,6 +221,10 @@ if __name__ == "__main__":
             'WeatherIntent': {
                 'templates': [
                     "what's the weather in {LocationKeyword}",
+                    "what's the forecast for {DayKeyword}",
+                    "what's the forecast for {LocationKeyword}"
+                    "what's the forecast for {LocationKeyword} on {DayKeyword}",
+                    "what's the forecast for {LocationKeyword} on {DayKeyword} {TimeKeyword}",
                     "is it {WeatherTypePresentKeyword} in {LocationKeyword}",
                     "will it {WeatherTypeFutureKeyword} this {TimeKeyword}",
                     "will it {WeatherTypeFutureKeyword} {DayKeyword}",
@@ -268,5 +273,9 @@ if __name__ == "__main__":
         intent = brain.determine_intent(phrase)
         print(phrase)
         pprint(intent)
+        # We can pass a "handle" method with the intent,
+        # and call it directly when we get our result.
+        # I'm just passing lambda functions above, but
+        # you can see how this
         intent['action']()
         print()
