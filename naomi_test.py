@@ -9,12 +9,15 @@ from pprint import pprint
 # https://stackoverflow.com/questions/35091557/replace-nth-occurrence-of-substring-in-string
 def replacenth(search_for, replace_with, string, n):
     try:
-        where = [m.start() for m in re.finditer(search_for, string)][n]
+        # print("Searching for: '{}' in '{}'".format(search_for, string))
+        # pprint([m.start() for m in re.finditer(search_for, string)])
+        where = [m.start() for m in re.finditer(search_for, string)][n-1]
         before = string[:where]
         after = string[where:]
         after = after.replace(search_for, replace_with, 1)
         string = before + after
     except IndexError:
+        # print("IndexError {}".format(n))
         pass
     return string
 
@@ -137,6 +140,7 @@ class Brain(object):
             }
         bestvariant = max(variantscores, key=lambda key:variantscores[key]['score'])
         # print("BEST: {}".format(bestvariant))
+        # pprint(variantscores[bestvariant])
         # find the template with the smallest levenshtein distance
         templates={}
         for template in brain.intent_map['intents'][bestintent]['templates']:
@@ -176,17 +180,18 @@ class Brain(object):
             for word in variantscores[bestvariant]['matches'][matchlist]:
                 # Substitute word into the variant (we know this matches the first
                 # occurrance of {matchlist})
-                # print("Matchlist: {} Word: {}".format(matchlist, word))
                 currentvariant = bestvariant.replace('{'+matchlist+'}', word, 1)
                 # print("Bestvariant with substitutions: {}".format(currentvariant))
                 templates = {}
                 # Get a count of the number of matches for the current matchlist in template
                 possiblesubstitutions = currenttemplate.count('{'+matchlist+'}')
+                # print("Matchlist: {} Word: {} Subs: {}".format(matchlist, word, possiblesubstitutions))
                 # We don't actually know if there are actually any substitutions in the template
                 if(possiblesubstitutions>0):
                     for i in range(possiblesubstitutions):
-                        currenttemplate=replacenth('{'+matchlist+'}', word, currenttemplate, i)
-                        templates[currenttemplate]=wer(currentvariant,currenttemplate)
+                        # print("i={}".format(i))
+                        currenttemplate=replacenth('{'+matchlist+'}', word, currenttemplate, i + 1)
+                        templates[currenttemplate]=wer(currentvariant, currenttemplate)
                     currenttemplate = min(templates, key=lambda key: templates[key])
                     # print(currenttemplate)
                 # print("{}: {}".format(word,currenttemplate))
@@ -208,23 +213,23 @@ class Brain(object):
                 variant=currentvariant.split()
                 # print("Template: {}".format(currenttemplate))
                 template=currenttemplate.split()
-                m=len(variant)+1
-                n=len(template)+1
+                n=len(variant)+1
+                m=len(template)+1
+                # print("Variant: '{}' length: {}".format(variant,n))
+                # print("Template: '{}' length: {}".format(template,m))
                 # Find out which column contains the first instance of substitution
                 s=template.index(subvar)+1
                 # print("subvar={} s={}".format(subvar,s))
                 match=[]
                 a=[]
                 for i in range(n+1):
-                    a.append([0]*(m+1))
+                    a.append([1]*(m+1))
                     a[i][0]=i
-                    a[i][m]=1
-                for j in range(m):
+                for j in range(m+1):
                     a[0][j]=j
-                    a[n][j]=1
                 for i in range(1,n):
                     for j in range(1,m):
-                        if(template[i-1] == variant[j-1]):
+                        if(variant[i-1] == template[j-1]):
                             c=0
                         else:
                             c=1
@@ -238,21 +243,25 @@ class Brain(object):
                 # examine the resulting list of matched words
                 # to locate the position of the unmatched keyword
                 matched = ""
-                for i in range(1,m):
-                    # print("s: {} i: {}".format(s,i))
-                    if(a[s-1][i-1]==0):
+                for i in range(1,n-1):
+                    # print("i: {} s: {}".format(i,s))
+                    if(a[i-1][s-1]==0):
                         # the previous item was a match
                         # so start here and work to the right until there is another match
-                        k=i-1
+                        k = i
                         start = k
+                        end = n - 1
                         compare = [k]
-                        compare.extend([1]*m)
+                        compare.extend([1]*(m))
+                        # print(variant[k])
                         # print("Comparing {} to {}".format(a[k],compare))
-                        while(a[k]==compare):
-                            match.append(variant[k])
+                        while(a[k]==compare and k < (n)):
+                            # print("k = {}".format(k))
+                            match.append(variant[k-1])
+                            # print(match)
                             k+=1
                             compare = [k]
-                            compare.extend([1]*m)
+                            compare.extend([1]*(m))
                             # print("Comparing {} to {}".format(a[k],compare))
                             end = k
                         matched = " ".join(match)
@@ -260,21 +269,24 @@ class Brain(object):
                         # pprint(variant)
                         # print("Start: {} End: {}".format(start,end))
                         substitutedvariant = variant[:start]
-                        substitutedvariant.append('{'+substitution+'}')
+                        substitutedvariant.append(subvar)
                         substitutedvariant.extend(variant[end:])
+                        break
                         # print("SubstitutedVariant: {}".format(substitutedvariant))
-                    elif(a[s+1][i+1]==0):
+                    elif(a[i+1][s+1]==0):
                         # the next item is a match, so start working backward
-                        k=i
+                        k = i
                         end = k
+                        start = 0
                         compare = [k]
-                        compare.extend([1]*m)
+                        compare.extend([1]*(m))
                         # print("Comparing {} to {}".format(a[k],compare))
                         while(a[k]==compare):
                             match.append(variant[k-1])
+                            # print(match)
                             k-=1
                             compare = [k]
-                            compare.extend([1]*m)
+                            compare.extend([1]*(m))
                             # print("Comparing {} to {}".format(a[k],compare))
                             start = k
                         matched = " ".join(reversed(match))
@@ -282,8 +294,9 @@ class Brain(object):
                         # pprint(variant)
                         # print("Start: {} End: {}".format(start,end))
                         substitutedvariant = variant[:start]
-                        substitutedvariant.append('{'+substitution+'}')
+                        substitutedvariant.append(subvar)
                         substitutedvariant.extend(variant[end:])
+                        break
                         # print("SubstitutedVariant: {}".format(substitutedvariant))
                 if(len(matched)):
                     # print("Match: '{}' to '{}'".format(substitution, matched))
@@ -336,7 +349,7 @@ if __name__ == "__main__":
                     'search for {Query} on {EngineKeyword}',
                     'search {EngineKeyword} for {Query}'
                 ],
-                'action': lambda intent: print("{} : SearchIntent".format(intent['input']))
+                'action': lambda intent: print("{} : SearchIntent : {}".format(intent['input'],intent['matches']))
             }
         }
     )
@@ -398,7 +411,9 @@ if __name__ == "__main__":
                     'WeatherTypeFutureKeyword': [
                         'snow', 
                         'rain', 
-                        'sleet'
+                        'be windy',
+                        'sleet',
+                        'be sunny'
                     ],
                     'LocationKeyword': [
                         'seattle', 
@@ -432,7 +447,9 @@ if __name__ == "__main__":
                     "is it {WeatherTypePresentKeyword} in {LocationKeyword}",
                     "will it {WeatherTypeFutureKeyword} this {TimeKeyword}",
                     "will it {WeatherTypeFutureKeyword} {DayKeyword}",
-                    "will it {WeatherTypeFutureKeyword} {DayKeyword} {TimeKeyword}"
+                    "will it {WeatherTypeFutureKeyword} {DayKeyword} {TimeKeyword}",
+                    "when will it {WeatherTypeFutureKeyword}",
+                    "when will is {WeatherTypeFutureKeyword} in {LocationKeyword}"
                 ],
                 'action': lambda intent: print("{} : WeatherIntent : {}".format(intent['input'], intent['matches']))
             }
@@ -466,6 +483,7 @@ if __name__ == "__main__":
     test_phrases = [
         "hello",
         "are the seahawks playing the bengals tomorrow",
+        "will the dallas cowboys play the seahawks tomorrow",
         "what's happening tomorrow",
         "please search for cats on youtube",
         "look up cats on google",
@@ -474,6 +492,7 @@ if __name__ == "__main__":
         "when will it rain in san francisco",
         "what's the weather like in san francisco today",
         "play some music by the who",
+        "play some music by janis joplin",
         "play some music",
         "play music",
         "play the who",
