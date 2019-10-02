@@ -26,7 +26,11 @@ class Brain(object):
     intent_map = {'intents': {}}
     keywords = {}
     words = {}
-    def add_intent(self, intents):
+
+    def add_intent(self,intent):
+        self.add_intents(intent)
+
+    def add_intents(self, intents):
         for intent in intents:
             # this prevents collisions between intents
             intent_base = intent
@@ -34,17 +38,17 @@ class Brain(object):
             while intent in self.intent_map['intents']:
                 intent_inc += 1
                 intent = "{}{}".format(intent_base, intent_inc)
-            if('keywords' in intents[intent]):
+            if('keywords' in intents[intent_base]):
                 try:
-                    self.keywords[intent].update(intents[intent]['keywords'])
+                    self.keywords[intent].update(intents[intent_base]['keywords'])
                 except KeyError:
-                    self.keywords[intent]=intents[intent]['keywords']
+                    self.keywords[intent]=intents[intent_base]['keywords']
             self.intent_map['intents'][intent] = {
-                'action': intents[intent]['action'],
+                'action': intents[intent_base]['action'],
                 'words': {},
                 'templates': []
             }
-            for phrase in intents[intent]['templates']:
+            for phrase in intents[intent_base]['templates']:
                 # Save the phrase so we can search for undefined keywords
                 self.intent_map['intents'][intent]['templates'].append(phrase)
                 for word in phrase.split():
@@ -57,11 +61,15 @@ class Brain(object):
                         self.words[word].update({intent: True})
                     except KeyError:
                         self.words[word]={intent: True}
-        # for each word in each intent, divide the word frequency by the number of examples
-        for intent in intents:
-            phrase_count = len(intents[intent]['templates'])
+            # for each word in each intent, divide the word frequency by the number of examples
+            phrase_count = len(intents[intent_base]['templates'])
             for word in self.intent_map['intents'][intent]['words']:
                 self.intent_map['intents'][intent]['words'][word]/=phrase_count
+
+    # The train method isn't really necessary for naomi.
+    @staticmethod
+    def train():
+        pass
 
     def determine_intent(self, phrase):
         # print(phrase)
@@ -133,7 +141,6 @@ class Brain(object):
             variantscores[variant]={
                 'intent': bestintent, 
                 'input': phrase, 
-                'variant': variant,
                 'score': intentscores[bestintent],
                 'matches': allvariants[variant],
                 'action': self.intent_map['intents'][bestintent]['action']
@@ -304,8 +311,8 @@ class Brain(object):
                         variantscores[bestvariant]['matches'][substitution].append(matched)
                     except KeyError:
                         variantscores[bestvariant]['matches'][substitution]=[matched]
-        variantscores[bestvariant]['template']=besttemplate
-        return variantscores[bestvariant]
+        # variantscores[bestvariant]['template']=besttemplate
+        return {variantscores[bestvariant]['intent']: variantscores[bestvariant]}
         
 
 if __name__ == "__main__":
@@ -475,6 +482,7 @@ if __name__ == "__main__":
             }
         }
     )
+    brain.train()
     # print("******Intent_map***********")
     # pprint(brain.intent_map['intents']['SearchIntent'])
     # print("******Words****************")
@@ -503,11 +511,11 @@ if __name__ == "__main__":
         print("Phrase: {}".format(phrase))
         intent = brain.determine_intent(phrase)
         # print(phrase)
-        # pprint(intent)
+        pprint(intent)
         # We can pass a "handle" method with the intent,
         # and call it directly when we get our result.
         # I'm just passing lambda functions above, but
         # you can see how this could be used to pass
         # a method from your plugin to be handled
-        intent['action'](intent)
+        # intent['action'](intent)
         print()
