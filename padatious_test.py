@@ -35,14 +35,15 @@ class Brain(object):
                     keyword_token = "{}_{}".format(intent,keyword)
                     print("Adding keyword '{}': {}".format(keyword_token,intents[intent_base]['keywords'][keyword]))
                     # map the keywords into the intents
-                    templates = [t.replace(keyword,keyword_token) for t in intents[intent_base]['templates']]
+                    templates = [t.replace(keyword,keyword_token) for t in templates]
                     self.container.add_entity(keyword_token, intents[intent_base]['keywords'][keyword])
             self.container.add_intent(intent, templates)
             pprint({intent: templates})
 
     # Call train after loading all the intents.
     def train(self):
-        self.container.train(debug=False)
+        print("Training")
+        self.container.train()
         self.trained = True
 
     def determine_intent(self, phrase):
