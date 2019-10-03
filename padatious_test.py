@@ -18,7 +18,7 @@ class Brain(object):
         
     def add_intents(self, intents):
         for intent in intents:
-            print("Adding intent {}".format(intent))
+            # print("Adding intent {}".format(intent))
             # this prevents collisions between intents
             intent_base = intent
             intent_inc = 0
@@ -27,18 +27,23 @@ class Brain(object):
                 intent = "{}{}".format(intent_base, intent_inc)
             self.intent_map['intents'][intent] = {
                 'action': intents[intent_base]['action'],
+                'name': intent_base,
                 'templates': []
             }
             templates = intents[intent_base]['templates']
             if('keywords' in intents[intent_base]):
                 for keyword in intents[intent_base]['keywords']:
                     keyword_token = "{}_{}".format(intent,keyword)
-                    print("Adding keyword '{}': {}".format(keyword_token,intents[intent_base]['keywords'][keyword]))
+                    self.keywords[keyword_token]={
+                        'words': intents[intent_base]['keywords'][keyword],
+                        'name': keyword
+                    }
+                    # print("Adding keyword '{}': {}".format(keyword_token,intents[intent_base]['keywords'][keyword]))
                     # map the keywords into the intents
                     templates = [t.replace(keyword,keyword_token) for t in templates]
                     self.container.add_entity(keyword_token, intents[intent_base]['keywords'][keyword])
             self.container.add_intent(intent, templates)
-            pprint({intent: templates})
+            # pprint({intent: templates})
 
     # Call train after loading all the intents.
     def train(self):
@@ -47,7 +52,26 @@ class Brain(object):
         self.trained = True
 
     def determine_intent(self, phrase):
-        return self.container.calc_intent(phrase)
+        response = {}
+        intent = self.container.calc_intent(phrase)
+        # pprint(intent)
+        if(intent):
+            intent_name = self.intent_map['intents'][intent.name]['name']
+            matches = {}
+            for match in intent.matches:
+                if match in self.keywords:
+                    matches.update({self.keywords[match]['name']: [intent[match]]})
+                else:
+                    matches.update({match: [intent[match]]})
+            response = {
+                intent.name: {
+                    'action': self.intent_map['intents'][intent.name]['action'],
+                    'input': phrase,
+                    'matches': [{self.keywords[match]['name'] if match in self.keywords else match: [intent[match]]} for match in intent.matches],
+                    'score': intent.conf
+                }
+            }
+        return response
         
 
 if __name__ == "__main__":
@@ -96,6 +120,12 @@ if __name__ == "__main__":
                         "google",
                         "youtube",
                         "instagram"
+                    ]
+                },
+                'regex': {
+                    'Query': [
+                        "for (?P<Query>) on",
+                        "for (?P<Query>.*)$"
                     ]
                 },
                 'templates': [
@@ -219,6 +249,11 @@ if __name__ == "__main__":
                         'the clash'
                     ]
                 },
+                'regex': {
+                    'ArtistKeyword': [
+                        "by (?P<ArtistKeyword>.*)$"
+                    ]
+                },
                 'templates': [
                     "play music by {ArtistKeyword}",
                     "play something by {ArtistKeyword}",
@@ -257,9 +292,9 @@ if __name__ == "__main__":
     for phrase in test_phrases:
         print("Phrase: {}".format(phrase))
         intent = brain.determine_intent(phrase)
-        pprint(intent)
+        #intent['action'](intent)
         # print(phrase)
-        # pprint(intent)
+        pprint(intent)
         # We can pass a "handle" method with the intent,
         # and call it directly when we get our result.
         # I'm just passing lambda functions above, but

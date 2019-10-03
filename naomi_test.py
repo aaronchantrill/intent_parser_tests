@@ -11,7 +11,7 @@ def replacenth(search_for, replace_with, string, n):
     try:
         # print("Searching for: '{}' in '{}'".format(search_for, string))
         # pprint([m.start() for m in re.finditer(search_for, string)])
-        where = [m.start() for m in re.finditer(search_for, string)][n-1]
+        where = [m.start() for m in re.finditer("{}{}{}".format(r"\b",search_for,r"\b"), string)][n-1]
         before = string[:where]
         after = string[where:]
         after = after.replace(search_for, replace_with, 1)
@@ -45,8 +45,9 @@ class Brain(object):
                     self.keywords[intent]=intents[intent_base]['keywords']
             self.intent_map['intents'][intent] = {
                 'action': intents[intent_base]['action'],
-                'words': {},
-                'templates': []
+                'name': intent_base,
+                'templates': [],
+                'words': {}
             }
             for phrase in intents[intent_base]['templates']:
                 # Save the phrase so we can search for undefined keywords
@@ -91,10 +92,11 @@ class Brain(object):
                             subs = dict(variants[variant])
                             # check and see if we can make a substitution and
                             # generate a new variant.
+                            # print("replacenth('{}', '{}', '{}', {})".format(word, '{'+keyword+'}', variant, count))
                             new = replacenth(word, '{'+keyword+'}', variant, count)
-                            #print(new)
+                            # print(new)
                             if new not in variants:
-                                #print(new)
+                                # print(new)
                                 try:
                                     subs[keyword].append(word)
                                 except KeyError:
@@ -312,7 +314,14 @@ class Brain(object):
                     except KeyError:
                         variantscores[bestvariant]['matches'][substitution]=[matched]
         # variantscores[bestvariant]['template']=besttemplate
-        return {variantscores[bestvariant]['intent']: variantscores[bestvariant]}
+        return {
+            self.intent_map['intents'][variantscores[bestvariant]['intent']]['name']: {
+                'action': variantscores[bestvariant]['action'],
+                'input': phrase,
+                'matches': variantscores[bestvariant]['matches'],
+                'score': variantscores[bestvariant]['score']
+            }
+        }
         
 
 if __name__ == "__main__":
@@ -320,9 +329,14 @@ if __name__ == "__main__":
     brain.add_intent(
         {
             'HelloIntent': {
+                'keywords': {
+                    'HelloKeyword': [
+                        'hi',
+                        'hello'
+                    ]
+                },
                 'templates': [
-                    "hi",
-                    "hello"
+                    '{HelloKeyword}'
                 ],
                 'action': lambda intent: print("{} : HelloIntent".format(intent['input']))
             }
@@ -331,11 +345,18 @@ if __name__ == "__main__":
     brain.add_intent(
         {
             'GoodbyeIntent': {
+                'keywords': {
+                    'GoodbyeKeyword': [
+                        "so long",
+                        "farewell",
+                        "later",
+                        "see you",
+                        "goodbye",
+                        "bye"
+                    ]
+                },
                 'templates': [
-                    "so long",
-                    "see you later",
-                    "goodbye",
-                    "bye"
+                    '{GoodbyeKeyword}'
                 ],
                 'action': lambda intent: print("{} : GoodbyeIntent".format(intent['input']))
             }
@@ -349,6 +370,12 @@ if __name__ == "__main__":
                         "google",
                         "youtube",
                         "instagram"
+                    ]
+                },
+                'regex': {
+                    'Query': [
+                        "for (?P<Query>) on",
+                        "for (?P<Query>.*)$"
                     ]
                 },
                 'templates': [
@@ -472,6 +499,11 @@ if __name__ == "__main__":
                         'the clash'
                     ]
                 },
+                'regex': {
+                    'ArtistKeyword': [
+                        "by (?P<ArtistKeyword>.*)$"
+                    ]
+                },
                 'templates': [
                     "play music by {ArtistKeyword}",
                     "play something by {ArtistKeyword}",
@@ -510,6 +542,7 @@ if __name__ == "__main__":
     for phrase in test_phrases:
         print("Phrase: {}".format(phrase))
         intent = brain.determine_intent(phrase)
+        #intent['action'](intent)
         # print(phrase)
         pprint(intent)
         # We can pass a "handle" method with the intent,
@@ -517,5 +550,5 @@ if __name__ == "__main__":
         # I'm just passing lambda functions above, but
         # you can see how this could be used to pass
         # a method from your plugin to be handled
-        # intent['action'](intent)
+        #intent['action'](intent)
         print()

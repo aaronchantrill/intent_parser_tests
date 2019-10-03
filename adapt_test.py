@@ -32,6 +32,7 @@ def makeindex(num):
 class Brain(object):
     intent_map = {'intents': {}}
     keywords = {}
+    regex = {}
     keyword_index = 0
     words = {}
     trained = False
@@ -51,6 +52,9 @@ class Brain(object):
                 for keyword_word in self.keywords[keyword_name]['words']:
                     # print("Registering '{}'".format(keyword_word))
                     self.engine.register_entity(keyword_word, keyword_name)
+            if keyword_name in self.regex:
+                for regex in self.regex[keyword_name]:
+                    self.engine.register_regex_entity(regex)
         else:
             # Just register the word as a required word
             self.keyword_index+=1
@@ -78,10 +82,18 @@ class Brain(object):
                         'words': intents[intent_base]['keywords'][keyword],
                         'name': keyword
                     }
+            if('regex' in intents[intent_base]):
+                for regex_name in intents[intent_base]['regex']:
+                    regex_token = "{}_{}".format(intent,regex_name)
+                    self.regex[regex_token]=[]
+                    for regex in intents[intent_base]['regex'][regex_name]:
+                        self.regex[regex_token].append(regex.replace(regex_name, regex_token))
+                pprint(self.regex)
             self.intent_map['intents'][intent] = {
                 'action': intents[intent_base]['action'],
-                'words': {},
-                'templates': []
+                'name': intent_base,
+                'templates': [],
+                'words': {}
             }
             for phrase in intents[intent_base]['templates']:
                 # Save the phrase so we can search for undefined keywords
@@ -106,7 +118,7 @@ class Brain(object):
             # Since a word is only counted once per example, regardless of how many times it appears,
             # if the number of times it was counted matches the number of examples, then
             # this is a "required" word.
-            phrase_count = len(intents[intent]['templates'])
+            phrase_count = len(intents[intent_base]['templates'])
             for word in self.intent_map['intents'][intent]['words']:
                 # print("Word: '{}' Count: {} Phrases: {} Weight: {}".format(word, self.intent_map['intents'][intent]['words'][word], phrase_count, weight(self.intent_map['intents'][intent]['words'][word], phrase_count)))
                 Weight = weight(self.intent_map['intents'][intent]['words'][word]['count'], phrase_count)
@@ -126,7 +138,7 @@ class Brain(object):
         for intent in self.intent_map['intents']:
             required_words = []
             optional_words = []
-            print("Training {}".format(intent))
+            # print("Training {}".format(intent))
             # pprint(self.keywords)
             for word in self.intent_map['intents'][intent]['words']:
                 weight = self.intent_map['intents'][intent]['words'][word]
@@ -134,9 +146,10 @@ class Brain(object):
                 word_appears_in = len(self.words[word])
                 # print("Word: {} Weight: {} Intents: {} Appears in: {}".format(word, weight, intents_count, word_appears_in))
                 self.intent_map['intents'][intent]['words'][word]['weight'] = self.intent_map['intents'][intent]['words'][word]['weight']*(intents_count - word_appears_in) / intents_count
+                word_token = "{}_{}".format(intent,word)
                 if(self.intent_map['intents'][intent]['words'][word]['required']):
                     # add the word as required.
-                    print("adding '{}' as required".format(word))
+                    # print("adding '{}' as required".format(word_token))
                     required_words.append(self.add_word(intent,word))
                 else:
                     # if the word is a keyword list, add it
@@ -144,25 +157,20 @@ class Brain(object):
                         optional_words.append(self.add_word(intent,word))
                     else:
                         if(self.intent_map['intents'][intent]['words'][word]['weight'] > 0.35):
-                            print("adding '{}' as optional".format(word))
+                            # print("adding '{}' as optional".format(word_token))
                             optional_words.append(self.add_word(intent,word))
-            a=None
+            a=IntentBuilder(intent)
             for keyword in required_words:
-                if(a):
-                    a=a.require(keyword)
-                else:
-                    a=IntentBuilder(intent).require(keyword)
+                # print("Required word: {}".format(keyword))
+                a=a.require(keyword)
             for keyword in optional_words:
-                if(a):
-                    a=a.optionally(keyword)
-                else:
-                    a=IntentBuilder(intent).optionally(keyword)
+                # print("Optional word: {}".format(keyword))
+                a=a.optionally(keyword)
             if(a):
-                print("Building {}".format(intent))
+                # print("Building {}".format(intent))
                 self.engine.register_intent_parser(a.build())
-        
         # pprint(self.intent_map['intents'])
-        print("")
+        # print("")
         self.trained = True
 
     def determine_intent(self, phrase):
@@ -179,7 +187,7 @@ class Brain(object):
                                 keywords[self.keywords[keyword]['name']] = [intent[keyword]]
                     response.update(
                         {
-                            intent['intent_type']: {
+                            self.intent_map['intents'][intent['intent_type']]['name']: {
                                 'action': self.intent_map['intents'][intent['intent_type']]['action'],
                                 'input': phrase,
                                 'matches': keywords,
@@ -238,6 +246,12 @@ if __name__ == "__main__":
                         "google",
                         "youtube",
                         "instagram"
+                    ]
+                },
+                'regex': {
+                    'Query': [
+                        "for (?P<Query>) on",
+                        "for (?P<Query>.*)$"
                     ]
                 },
                 'templates': [
@@ -359,6 +373,11 @@ if __name__ == "__main__":
                         'third eye blind',
                         'the who',
                         'the clash'
+                    ]
+                },
+                'regex': {
+                    'ArtistKeyword': [
+                        "by (?P<ArtistKeyword>.*)$"
                     ]
                 },
                 'templates': [
